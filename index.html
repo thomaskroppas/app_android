@@ -12,11 +12,18 @@
     --used-bg: #f0fdf4; --used-text: #15803d; --danger: #dc2626;
   }
   @media (prefers-color-scheme: dark) {
-    :root {
+    :root:not([data-theme="light"]) {
       --bg: #0f1115; --card: #181b22; --text: #e5e7eb; --muted: #9ca3af;
       --border: #2a2f3a; --accent: #3b82f6; --accent-text: #fff;
       --used-bg: #13261a; --used-text: #4ade80; --danger: #f87171;
+      color-scheme: dark;
     }
+  }
+  :root[data-theme="dark"] {
+    --bg: #0f1115; --card: #181b22; --text: #e5e7eb; --muted: #9ca3af;
+    --border: #2a2f3a; --accent: #3b82f6; --accent-text: #fff;
+    --used-bg: #13261a; --used-text: #4ade80; --danger: #f87171;
+    color-scheme: dark;
   }
   * { box-sizing: border-box; }
   body {
@@ -24,12 +31,20 @@
     font: 16px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   }
   header {
-    position: sticky; top: 0; z-index: 2; background: var(--card);
+    position: sticky; top: env(safe-area-inset-top, 0px); z-index: 2; background: var(--card);
     border-bottom: 1px solid var(--border);
     display: flex; align-items: center; justify-content: space-between;
     padding: 10px 16px; gap: 12px;
   }
   header h1 { font-size: 17px; margin: 0; }
+  body::before {
+    content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px);
+    z-index: 10; background: var(--card);
+  }
+  button.danger { color: var(--danger); }
+  .confirm { border-color: var(--danger); }
+  .confirm p { margin: 0 0 12px; }
+  .sync { margin: 10px 0 0; }
   main { max-width: 640px; margin: 0 auto; padding: 16px; }
   button {
     font: inherit; border: 1px solid var(--border); background: var(--card);
@@ -92,7 +107,19 @@
       <button id="cancelBtn" hidden>Отмена</button>
     </div>
     <p class="error" id="error"></p>
-    <p class="muted">Почта сохраняется только в этом браузере. Точки, которые уже есть в почте, убираются.</p>
+    <p class="muted">Точки, которые уже есть в почте, убираются.</p>
+  </section>
+
+  <section id="loading" class="card">
+    <p class="muted">Загружаю отметки…</p>
+  </section>
+
+  <section id="confirmBox" class="card confirm" hidden>
+    <p id="confirmText"></p>
+    <div class="row">
+      <button id="confirmYes" class="primary"></button>
+      <button id="confirmNo">Отмена</button>
+    </div>
   </section>
 
   <section id="app" hidden>
@@ -102,8 +129,10 @@
       <div class="row">
         <button id="copyNextBtn" class="primary">Скопировать</button>
         <button id="useNextBtn">Отметить использованной</button>
+        <button id="resetBtn" class="danger">Сбросить</button>
       </div>
       <p class="muted" id="stats"></p>
+      <p class="muted sync" id="syncNote"></p>
     </div>
 
     <div class="card list">
@@ -119,25 +148,112 @@
 (function () {
   "use strict";
 
-  const STORAGE_KEY = "dotEmails.v1";
+  const LOCAL_KEY = "dotEmails.v1";
   const PAGE_SIZE = 300;
+  const SYNC_WAIT_MS = 10000;
 
   // ---------- storage ----------
-  function loadState() {
+  // Two backends with the same shape. On claude.ai the page gets a database
+  // tied to the viewer's account, so marks follow the person across devices.
+  // Anywhere else (GitHub Pages, a local file) marks stay in this browser.
+
+  function readLocal() {
     try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      const parsed = raw ? JSON.parse(raw) : null;
+      const parsed = JSON.parse(localStorage.getItem(LOCAL_KEY) || "null");
       if (parsed && typeof parsed === "object") return { current: parsed.current || null, used: parsed.used || {} };
     } catch (e) { /* storage unavailable or corrupt */ }
     return { current: null, used: {} };
   }
 
-  function saveState(next) {
-    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(next)); }
-    catch (e) { showToast("Не удалось сохранить (хранилище недоступно)"); }
+  function writeLocal(data) {
+    try { localStorage.setItem(LOCAL_KEY, JSON.stringify(data)); return true; }
+    catch (e) { return false; }
   }
 
-  let state = loadState();
+  function localStore() {
+    return {
+      synced: false,
+      async loadCurrent() { return readLocal().current; },
+      async saveCurrent(email) {
+        const data = readLocal();
+        if (!writeLocal({ ...data, current: email })) throw new Error("local");
+      },
+      watchUsed(email, onChange) {
+        onChange(readLocal().used[email] || []);
+        return () => {};
+      },
+      async saveUsed(email, list) {
+        const data = readLocal();
+        if (!writeLocal({ ...data, used: { ...data.used, [email]: list } })) throw new Error("local");
+      },
+    };
+  }
+
+  // Doc ids allow only letters, digits and _ - . ~ : @ +
+  function docKey(email) {
+    return encodeURIComponent(email).replace(/%/g, "~").replace(/[^A-Za-z0-9_.~:@+-]/g, "~").slice(0, 190);
+  }
+
+  // Serializes writes per document and collapses bursts into the latest value.
+  function writer(ref) {
+    let pending = null;
+    let running = null;
+    async function flush() {
+      while (pending) {
+        const body = pending;
+        pending = null;
+        await ref.set(body);
+      }
+    }
+    return function write(body) {
+      pending = body;
+      if (!running) running = flush().finally(() => { running = null; });
+      return running;
+    };
+  }
+
+  function dbStore(db, uid) {
+    const base = "data/users/" + uid;
+    const stateRef = db.doc(base + "/state");
+    const writeState = writer(stateRef);
+    const writers = {};
+    const emailRef = (email) => db.doc(base + "/" + "e_" + docKey(email));
+    return {
+      synced: true,
+      async loadCurrent() {
+        const snap = await stateRef.get();
+        return snap.exists ? (snap.data().current || null) : null;
+      },
+      saveCurrent(email) { return writeState({ current: email }); },
+      watchUsed(email, onChange, onError) {
+        return emailRef(email).onSnapshot(
+          (snap) => onChange(snap.exists && Array.isArray(snap.data().used) ? snap.data().used.slice() : []),
+          onError
+        );
+      },
+      saveUsed(email, list) {
+        const key = docKey(email);
+        if (!writers[key]) writers[key] = writer(emailRef(email));
+        return writers[key]({ email: email, used: list, updatedAt: Date.now() });
+      },
+    };
+  }
+
+  function withTimeout(promise, ms) {
+    return Promise.race([promise, new Promise((resolve) => setTimeout(() => resolve(null), ms))]);
+  }
+
+  async function openStore() {
+    if (!window.claude || typeof window.claude.use !== "function") return localStore();
+    try {
+      const [db, user] = await withTimeout(
+        Promise.all([window.claude.use("db"), window.claude.use("user")]), SYNC_WAIT_MS
+      ) || [];
+      const uid = user ? await user.id() : null;
+      if (db && uid) return dbStore(db, uid);
+    } catch (e) { /* fall back to this browser */ }
+    return localStore();
+  }
 
   // ---------- variants ----------
   function normalize(input) {
@@ -190,56 +306,85 @@
   // ---------- UI ----------
   const $ = (id) => document.getElementById(id);
   const els = {
-    setup: $("setup"), app: $("app"), changeBtn: $("changeBtn"),
+    loading: $("loading"), setup: $("setup"), app: $("app"), changeBtn: $("changeBtn"),
     emailInput: $("emailInput"), saveBtn: $("saveBtn"), cancelBtn: $("cancelBtn"), error: $("error"),
     nextEmail: $("nextEmail"), nextNum: $("nextNum"), copyNextBtn: $("copyNextBtn"),
-    useNextBtn: $("useNextBtn"), stats: $("stats"), groups: $("groups"), moreBtn: $("moreBtn"),
-    toast: $("toast"),
+    useNextBtn: $("useNextBtn"), resetBtn: $("resetBtn"), stats: $("stats"), syncNote: $("syncNote"),
+    groups: $("groups"), moreBtn: $("moreBtn"), toast: $("toast"),
+    confirmBox: $("confirmBox"), confirmText: $("confirmText"), confirmYes: $("confirmYes"), confirmNo: $("confirmNo"),
   };
 
+  let store = null;
+  let current = null;
+  let used = [];
+  let stopWatching = () => {};
   let iterator = null;
   let rendered = 0;
   let lastGroup = -1;
   let currentList = null;
   let nextVariant = null;
 
-  function usedSet() {
-    return state.used[state.current] || [];
-  }
-
   function isUsed(address) {
-    return usedSet().includes(address);
+    return used.includes(address);
   }
 
-  function setUsed(address, used) {
-    const list = usedSet().filter((a) => a !== address);
-    const updated = used ? list.concat(address) : list;
-    state = { ...state, used: { ...state.used, [state.current]: updated } };
-    saveState(state);
+  function persistUsed() {
+    store.saveUsed(current, used).catch(() => showToast("Не удалось сохранить отметку, проверь соединение"));
+  }
+
+  function setUsed(address, value) {
+    const rest = used.filter((a) => a !== address);
+    used = value ? rest.concat(address) : rest;
+    markItem(address, value);
+    refreshNext();
+    persistUsed();
   }
 
   function findNext() {
-    for (const v of variants(state.current)) {
+    for (const v of variants(current)) {
       if (!isUsed(v.address)) return v;
     }
     return null;
   }
 
   function showSetup() {
+    hideConfirm();
+    els.loading.hidden = true;
     els.setup.hidden = false;
     els.app.hidden = true;
     els.changeBtn.hidden = true;
-    els.cancelBtn.hidden = !state.current;
+    els.cancelBtn.hidden = !current;
     els.emailInput.value = "";
     els.error.textContent = "";
     els.emailInput.focus();
   }
 
   function showApp() {
+    hideConfirm();
+    els.loading.hidden = true;
     els.setup.hidden = true;
     els.app.hidden = false;
     els.changeBtn.hidden = false;
-    iterator = variants(state.current);
+    els.syncNote.textContent = store.synced
+      ? "Отметки синхронизируются между устройствами, где ты вошёл в claude.ai."
+      : "Отметки хранятся только в этом браузере.";
+    renderList();
+  }
+
+  function watchCurrent() {
+    stopWatching();
+    stopWatching = store.watchUsed(current, applyUsed, () => showToast("Синхронизация прервалась, обнови страницу"));
+  }
+
+  // Repaints marks in place so the expanded list keeps its length.
+  function applyUsed(list) {
+    used = list;
+    els.groups.querySelectorAll("li").forEach((li) => paintItem(li, isUsed(li.dataset.address)));
+    refreshNext();
+  }
+
+  function renderList() {
+    iterator = variants(current);
     rendered = 0;
     lastGroup = -1;
     currentList = null;
@@ -250,8 +395,7 @@
 
   function refreshNext() {
     nextVariant = findNext();
-    const total = totalCount(state.current);
-    const usedCount = usedSet().length;
+    const total = totalCount(current);
     if (nextVariant) {
       els.nextEmail.textContent = nextVariant.address;
       els.nextNum.textContent = "(№" + (nextVariant.index + 1) + ")";
@@ -261,7 +405,8 @@
     }
     els.copyNextBtn.disabled = !nextVariant;
     els.useNextBtn.disabled = !nextVariant;
-    els.stats.textContent = "Использовано " + usedCount + " из " + total.toLocaleString("ru-RU");
+    els.resetBtn.disabled = used.length === 0;
+    els.stats.textContent = "Использовано " + used.length + " из " + total.toLocaleString("ru-RU");
     document.querySelectorAll("li.current").forEach((li) => li.classList.remove("current"));
     if (nextVariant) {
       const li = document.querySelector('li[data-index="' + nextVariant.index + '"]');
@@ -299,14 +444,13 @@
     }
     els.groups.appendChild(frag);
     rendered += count;
-    els.moreBtn.hidden = done || rendered >= totalCount(state.current);
+    els.moreBtn.hidden = done || rendered >= totalCount(current);
   }
 
   function renderItem(v) {
     const li = document.createElement("li");
     li.dataset.index = v.index;
     li.dataset.address = v.address;
-    if (isUsed(v.address)) li.classList.add("used");
 
     const num = document.createElement("span");
     num.className = "num";
@@ -323,21 +467,39 @@
     copy.dataset.action = "copy";
 
     const toggle = document.createElement("button");
-    toggle.textContent = isUsed(v.address) ? "↺" : "✓";
-    toggle.title = isUsed(v.address) ? "Вернуть" : "Отметить использованной";
     toggle.dataset.action = "toggle";
 
     li.append(num, addr, copy, toggle);
+    paintItem(li, isUsed(v.address));
     return li;
   }
 
-  function markItem(address, used) {
-    const li = document.querySelector('li[data-address="' + CSS.escape(address) + '"]');
-    if (!li) return;
-    li.classList.toggle("used", used);
+  function paintItem(li, value) {
+    li.classList.toggle("used", value);
     const toggle = li.querySelector('[data-action="toggle"]');
-    toggle.textContent = used ? "↺" : "✓";
-    toggle.title = used ? "Вернуть" : "Отметить использованной";
+    toggle.textContent = value ? "↺" : "✓";
+    toggle.title = value ? "Вернуть" : "Отметить использованной";
+    toggle.setAttribute("aria-label", toggle.title);
+  }
+
+  function markItem(address, value) {
+    const li = document.querySelector('li[data-address="' + CSS.escape(address) + '"]');
+    if (li) paintItem(li, value);
+  }
+
+  // The artifact viewer blocks confirm(), so confirmations live in the page.
+  let confirmAction = null;
+  function askConfirm(text, yesLabel, action) {
+    confirmAction = action;
+    els.confirmText.textContent = text;
+    els.confirmYes.textContent = yesLabel;
+    els.confirmBox.hidden = false;
+    els.confirmBox.scrollIntoView({ block: "nearest" });
+    els.confirmNo.focus();
+  }
+  function hideConfirm() {
+    confirmAction = null;
+    els.confirmBox.hidden = true;
   }
 
   async function copyText(text) {
@@ -348,8 +510,10 @@
       ta.value = text;
       document.body.appendChild(ta);
       ta.select();
-      try { document.execCommand("copy"); } catch (err) { showToast("Не удалось скопировать"); ta.remove(); return; }
+      let ok = false;
+      try { ok = document.execCommand("copy"); } catch (err) { ok = false; }
       ta.remove();
+      if (!ok) { showToast("Не удалось скопировать, выдели адрес вручную"); return; }
     }
     showToast("Скопировано: " + text);
   }
@@ -359,16 +523,25 @@
     els.toast.textContent = text;
     els.toast.classList.add("show");
     clearTimeout(toastTimer);
-    toastTimer = setTimeout(() => els.toast.classList.remove("show"), 1600);
+    toastTimer = setTimeout(() => els.toast.classList.remove("show"), 1800);
   }
 
   // ---------- events ----------
-  els.saveBtn.addEventListener("click", () => {
+  els.saveBtn.addEventListener("click", async () => {
     const email = normalize(els.emailInput.value);
-    if (!email) { els.error.textContent = "Похоже, это не почта"; return; }
-    state = { ...state, current: email };
-    saveState(state);
+    if (!email) { els.error.textContent = "Похоже, это не почта. Пример: name@gmail.com"; return; }
+    els.saveBtn.disabled = true;
+    try {
+      await store.saveCurrent(email);
+    } catch (e) {
+      showToast("Не удалось сохранить почту, проверь соединение");
+    } finally {
+      els.saveBtn.disabled = false;
+    }
+    current = email;
+    used = [];
     showApp();
+    watchCurrent();
   });
 
   els.emailInput.addEventListener("keydown", (e) => {
@@ -378,18 +551,27 @@
   els.cancelBtn.addEventListener("click", showApp);
 
   els.changeBtn.addEventListener("click", () => {
-    if (confirm("Поменять почту? Отметки для текущей почты сохранятся.")) showSetup();
+    askConfirm("Поменять почту? Отметки для текущей почты сохранятся.", "Поменять", showSetup);
   });
+
+  els.resetBtn.addEventListener("click", () => {
+    askConfirm("Сбросить все отметки (" + used.length + ") для этой почты?", "Сбросить", () => {
+      hideConfirm();
+      applyUsed([]);
+      persistUsed();
+      showToast("Отметки сброшены");
+    });
+  });
+
+  els.confirmYes.addEventListener("click", () => { if (confirmAction) confirmAction(); });
+  els.confirmNo.addEventListener("click", hideConfirm);
 
   els.copyNextBtn.addEventListener("click", () => {
     if (nextVariant) copyText(nextVariant.address);
   });
 
   els.useNextBtn.addEventListener("click", () => {
-    if (!nextVariant) return;
-    setUsed(nextVariant.address, true);
-    markItem(nextVariant.address, true);
-    refreshNext();
+    if (nextVariant) setUsed(nextVariant.address, true);
   });
 
   els.moreBtn.addEventListener("click", () => { renderMore(); refreshNext(); });
@@ -398,17 +580,18 @@
     const btn = e.target.closest("button[data-action]");
     if (!btn) return;
     const address = btn.closest("li").dataset.address;
-    if (btn.dataset.action === "copy") {
-      copyText(address);
-    } else {
-      const used = !isUsed(address);
-      setUsed(address, used);
-      markItem(address, used);
-      refreshNext();
-    }
+    if (btn.dataset.action === "copy") copyText(address);
+    else setUsed(address, !isUsed(address));
   });
 
-  if (state.current) showApp(); else showSetup();
+  // ---------- start ----------
+  (async function start() {
+    store = await openStore();
+    try { current = await store.loadCurrent(); } catch (e) { current = null; }
+    if (!current) { showSetup(); return; }
+    showApp();
+    watchCurrent();
+  })();
 })();
 </script>
 </body>
