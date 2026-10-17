@@ -80,6 +80,8 @@
   li.used { background: var(--used-bg); }
   li.used .addr { color: var(--used-text); text-decoration: line-through; }
   li.current { outline: 2px solid var(--accent); outline-offset: -2px; border-radius: 8px; }
+  li .date { color: var(--used-text); font-size: 12px; white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .last { font-weight: 600; color: var(--text); }
   li button { padding: 4px 0; width: 34px; font-size: 15px; flex-shrink: 0; }
   .list { padding: 4px 0; }
   .more { display: block; width: 100%; margin-top: 12px; }
@@ -110,7 +112,7 @@
     <p class="muted">Точки, которые уже есть в почте, убираются.</p>
   </section>
 
-  <section id="loading" class="card">
+  <section id="loading" class="card" hidden>
     <p class="muted">Загружаю отметки…</p>
   </section>
 
@@ -131,8 +133,8 @@
         <button id="useNextBtn">Отметить использованной</button>
         <button id="resetBtn" class="danger">Сбросить</button>
       </div>
+      <p class="muted"><span class="last" id="lastUsed"></span></p>
       <p class="muted" id="stats"></p>
-      <p class="muted sync" id="syncNote"></p>
     </div>
 
     <div class="card list">
@@ -148,111 +150,101 @@
 (function () {
   "use strict";
 
-  const LOCAL_KEY = "dotEmails.v1";
+  // Firebase Realtime Database of the "mail-randomizer-github" project.
+  // Marks live at emails/<email key>/used/<variant number> = timestamp (ms).
+  const DB_NAME = "mail-randomizer-github-default-rtdb";
+  const DB_CANDIDATES = [
+    "https://" + DB_NAME + ".firebaseio.com",
+    "https://" + DB_NAME + ".europe-west1.firebasedatabase.app",
+    "https://" + DB_NAME + ".asia-southeast1.firebasedatabase.app",
+  ];
+  const LOCAL_KEY = "dotEmails.v2";
   const PAGE_SIZE = 300;
-  const SYNC_WAIT_MS = 10000;
+  const DAY_MS = 24 * 60 * 60 * 1000;
 
-  // ---------- storage ----------
-  // Two backends with the same shape. On claude.ai the page gets a database
-  // tied to the viewer's account, so marks follow the person across devices.
-  // Anywhere else (GitHub Pages, a local file) marks stay in this browser.
-
+  // ---------- this device: which email is open, which db url works ----------
   function readLocal() {
-    try {
-      const parsed = JSON.parse(localStorage.getItem(LOCAL_KEY) || "null");
-      if (parsed && typeof parsed === "object") return { current: parsed.current || null, used: parsed.used || {} };
-    } catch (e) { /* storage unavailable or corrupt */ }
-    return { current: null, used: {} };
+    try { return JSON.parse(localStorage.getItem(LOCAL_KEY) || "{}") || {}; }
+    catch (e) { return {}; }
+  }
+  function writeLocal(patch) {
+    try { localStorage.setItem(LOCAL_KEY, JSON.stringify({ ...readLocal(), ...patch })); }
+    catch (e) { /* private mode: the page still works, it just asks for the email again */ }
   }
 
-  function writeLocal(data) {
-    try { localStorage.setItem(LOCAL_KEY, JSON.stringify(data)); return true; }
-    catch (e) { return false; }
-  }
+  // ---------- Firebase REST ----------
+  let dbUrl = null;
 
-  function localStore() {
-    return {
-      synced: false,
-      async loadCurrent() { return readLocal().current; },
-      async saveCurrent(email) {
-        const data = readLocal();
-        if (!writeLocal({ ...data, current: email })) throw new Error("local");
-      },
-      watchUsed(email, onChange) {
-        onChange(readLocal().used[email] || []);
-        return () => {};
-      },
-      async saveUsed(email, list) {
-        const data = readLocal();
-        if (!writeLocal({ ...data, used: { ...data.used, [email]: list } })) throw new Error("local");
-      },
-    };
-  }
-
-  // Doc ids allow only letters, digits and _ - . ~ : @ +
-  function docKey(email) {
-    return encodeURIComponent(email).replace(/%/g, "~").replace(/[^A-Za-z0-9_.~:@+-]/g, "~").slice(0, 190);
-  }
-
-  // Serializes writes per document and collapses bursts into the latest value.
-  function writer(ref) {
-    let pending = null;
-    let running = null;
-    async function flush() {
-      while (pending) {
-        const body = pending;
-        pending = null;
-        await ref.set(body);
-      }
+  async function probe(base) {
+    const res = await fetch(base + "/emails.json?shallow=true");
+    if (res.ok) return base;
+    const text = await res.text();
+    // A database in another region answers with its real address in the error.
+    const hint = text.match(/https:\/\/[a-z0-9.-]+\.(?:firebaseio\.com|firebasedatabase\.app)/i);
+    if (hint && hint[0] !== base) {
+      const other = await fetch(hint[0] + "/emails.json?shallow=true");
+      if (other.ok) return hint[0];
     }
-    return function write(body) {
-      pending = body;
-      if (!running) running = flush().finally(() => { running = null; });
-      return running;
-    };
+    throw new Error(res.status + " " + text.slice(0, 200));
   }
 
-  function dbStore(db, uid) {
-    const base = "data/users/" + uid;
-    const stateRef = db.doc(base + "/state");
-    const writeState = writer(stateRef);
-    const writers = {};
-    const emailRef = (email) => db.doc(base + "/" + "e_" + docKey(email));
-    return {
-      synced: true,
-      async loadCurrent() {
-        const snap = await stateRef.get();
-        return snap.exists ? (snap.data().current || null) : null;
-      },
-      saveCurrent(email) { return writeState({ current: email }); },
-      watchUsed(email, onChange, onError) {
-        return emailRef(email).onSnapshot(
-          (snap) => onChange(snap.exists && Array.isArray(snap.data().used) ? snap.data().used.slice() : []),
-          onError
-        );
-      },
-      saveUsed(email, list) {
-        const key = docKey(email);
-        if (!writers[key]) writers[key] = writer(emailRef(email));
-        return writers[key]({ email: email, used: list, updatedAt: Date.now() });
-      },
-    };
+  async function resolveDb() {
+    const cached = readLocal().dbUrl;
+    const list = cached ? [cached].concat(DB_CANDIDATES.filter((u) => u !== cached)) : DB_CANDIDATES;
+    let lastError = null;
+    for (const base of list) {
+      try {
+        const url = await probe(base);
+        writeLocal({ dbUrl: url });
+        return url;
+      } catch (e) { lastError = e; }
+    }
+    throw lastError || new Error("no database");
   }
 
-  function withTimeout(promise, ms) {
-    return Promise.race([promise, new Promise((resolve) => setTimeout(() => resolve(null), ms))]);
+  // Firebase keys may not contain . $ # [ ] /
+  function emailKey(email) {
+    return encodeURIComponent(email).replace(/\./g, ",").replace(/[$#\[\]\/]/g, "_");
   }
 
-  async function openStore() {
-    if (!window.claude || typeof window.claude.use !== "function") return localStore();
-    try {
-      const [db, user] = await withTimeout(
-        Promise.all([window.claude.use("db"), window.claude.use("user")]), SYNC_WAIT_MS
-      ) || [];
-      const uid = user ? await user.id() : null;
-      if (db && uid) return dbStore(db, uid);
-    } catch (e) { /* fall back to this browser */ }
-    return localStore();
+  function usedUrl(email, index) {
+    return dbUrl + "/emails/" + emailKey(email) + "/used" + (index === undefined ? "" : "/" + index) + ".json";
+  }
+
+  async function request(url, method, body) {
+    const res = await fetch(url, {
+      method: method,
+      headers: body === undefined ? {} : { "Content-Type": "application/json" },
+      body: body === undefined ? undefined : JSON.stringify(body),
+    });
+    if (!res.ok) throw new Error(res.status + " " + (await res.text()).slice(0, 200));
+    return res.json();
+  }
+
+  // Live stream of emails/<key>/used. Firebase sends "put" and "patch" events.
+  function watchUsed(email, onChange, onError) {
+    const source = new EventSource(usedUrl(email));
+    let data = {};
+    function apply(kind, payload) {
+      const path = payload.path.replace(/^\//, "");
+      if (kind === "put" && path === "") data = { ...(payload.data || {}) };
+      else if (kind === "put") {
+        const next = { ...data };
+        if (payload.data === null) delete next[path]; else next[path] = payload.data;
+        data = next;
+      } else if (kind === "patch") {
+        const next = { ...data };
+        Object.entries(payload.data || {}).forEach(([k, v]) => { if (v === null) delete next[k]; else next[k] = v; });
+        data = next;
+      }
+      onChange(data);
+    }
+    source.addEventListener("put", (e) => apply("put", JSON.parse(e.data)));
+    source.addEventListener("patch", (e) => apply("patch", JSON.parse(e.data)));
+    source.addEventListener("cancel", () => onError("Доступ к базе запрещён, проверь правила Firebase"));
+    source.addEventListener("auth_revoked", () => onError("Доступ к базе запрещён, проверь правила Firebase"));
+    source.onerror = () => { if (source.readyState === EventSource.CLOSED) onError("Связь с базой потеряна, обнови страницу"); };
+    return () => source.close();
   }
 
   // ---------- variants ----------
@@ -303,20 +295,35 @@
     return Math.pow(2, Math.max(localLen - 1, 0));
   }
 
+  // ---------- dates ----------
+  function formatDate(ts, short) {
+    return new Date(ts).toLocaleDateString("ru-RU", { day: "2-digit", month: "2-digit", year: short ? "2-digit" : "numeric" });
+  }
+
+  function daysAgo(ts) {
+    const start = (d) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+    const days = Math.round((start(new Date()) - start(new Date(ts))) / DAY_MS);
+    if (days <= 0) return "сегодня";
+    if (days === 1) return "вчера";
+    const mod10 = days % 10, mod100 = days % 100;
+    const word = mod10 === 1 && mod100 !== 11 ? "день"
+      : mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14) ? "дня" : "дней";
+    return days + " " + word + " назад";
+  }
+
   // ---------- UI ----------
   const $ = (id) => document.getElementById(id);
   const els = {
     loading: $("loading"), setup: $("setup"), app: $("app"), changeBtn: $("changeBtn"),
     emailInput: $("emailInput"), saveBtn: $("saveBtn"), cancelBtn: $("cancelBtn"), error: $("error"),
     nextEmail: $("nextEmail"), nextNum: $("nextNum"), copyNextBtn: $("copyNextBtn"),
-    useNextBtn: $("useNextBtn"), resetBtn: $("resetBtn"), stats: $("stats"), syncNote: $("syncNote"),
+    useNextBtn: $("useNextBtn"), resetBtn: $("resetBtn"), stats: $("stats"), lastUsed: $("lastUsed"),
     groups: $("groups"), moreBtn: $("moreBtn"), toast: $("toast"),
     confirmBox: $("confirmBox"), confirmText: $("confirmText"), confirmYes: $("confirmYes"), confirmNo: $("confirmNo"),
   };
 
-  let store = null;
   let current = null;
-  let used = [];
+  let used = {}; // variant index -> timestamp when it was marked
   let stopWatching = () => {};
   let iterator = null;
   let rendered = 0;
@@ -324,27 +331,35 @@
   let currentList = null;
   let nextVariant = null;
 
-  function isUsed(address) {
-    return used.includes(address);
+  function usedAt(index) {
+    return used[index] || null;
   }
 
-  function persistUsed() {
-    store.saveUsed(current, used).catch(() => showToast("Не удалось сохранить отметку, проверь соединение"));
-  }
-
-  function setUsed(address, value) {
-    const rest = used.filter((a) => a !== address);
-    used = value ? rest.concat(address) : rest;
-    markItem(address, value);
-    refreshNext();
-    persistUsed();
+  async function setUsed(index, value) {
+    const before = used;
+    const next = { ...used };
+    if (value) next[index] = Date.now(); else delete next[index];
+    applyUsed(next);
+    try {
+      await request(usedUrl(current, index), value ? "PUT" : "DELETE", value ? next[index] : undefined);
+    } catch (e) {
+      applyUsed(before);
+      showToast("Не удалось сохранить отметку, проверь интернет");
+    }
   }
 
   function findNext() {
     for (const v of variants(current)) {
-      if (!isUsed(v.address)) return v;
+      if (!usedAt(v.index)) return v;
     }
     return null;
+  }
+
+  function showLoading(text) {
+    els.loading.querySelector("p").textContent = text;
+    els.loading.hidden = false;
+    els.setup.hidden = true;
+    els.app.hidden = true;
   }
 
   function showSetup() {
@@ -359,27 +374,23 @@
     els.emailInput.focus();
   }
 
-  function showApp() {
+  function openEmail(email) {
     hideConfirm();
+    current = email;
+    used = {};
     els.loading.hidden = true;
     els.setup.hidden = true;
     els.app.hidden = false;
     els.changeBtn.hidden = false;
-    els.syncNote.textContent = store.synced
-      ? "Отметки синхронизируются между устройствами, где ты вошёл в claude.ai."
-      : "Отметки хранятся только в этом браузере.";
     renderList();
-  }
-
-  function watchCurrent() {
     stopWatching();
-    stopWatching = store.watchUsed(current, applyUsed, () => showToast("Синхронизация прервалась, обнови страницу"));
+    stopWatching = watchUsed(email, applyUsed, showToast);
   }
 
   // Repaints marks in place so the expanded list keeps its length.
-  function applyUsed(list) {
-    used = list;
-    els.groups.querySelectorAll("li").forEach((li) => paintItem(li, isUsed(li.dataset.address)));
+  function applyUsed(map) {
+    used = map;
+    els.groups.querySelectorAll("li").forEach((li) => paintItem(li, usedAt(li.dataset.index)));
     refreshNext();
   }
 
@@ -395,6 +406,7 @@
 
   function refreshNext() {
     nextVariant = findNext();
+    const stamps = Object.values(used);
     const total = totalCount(current);
     if (nextVariant) {
       els.nextEmail.textContent = nextVariant.address;
@@ -405,8 +417,12 @@
     }
     els.copyNextBtn.disabled = !nextVariant;
     els.useNextBtn.disabled = !nextVariant;
-    els.resetBtn.disabled = used.length === 0;
-    els.stats.textContent = "Использовано " + used.length + " из " + total.toLocaleString("ru-RU");
+    els.resetBtn.disabled = stamps.length === 0;
+    const last = stamps.length ? Math.max.apply(null, stamps) : null;
+    els.lastUsed.textContent = last
+      ? "Последняя регистрация: " + formatDate(last) + " (" + daysAgo(last) + ")"
+      : "Регистраций ещё не было";
+    els.stats.textContent = "Использовано " + stamps.length + " из " + total.toLocaleString("ru-RU");
     document.querySelectorAll("li.current").forEach((li) => li.classList.remove("current"));
     if (nextVariant) {
       const li = document.querySelector('li[data-index="' + nextVariant.index + '"]');
@@ -460,6 +476,9 @@
     addr.className = "addr";
     addr.textContent = v.address;
 
+    const date = document.createElement("span");
+    date.className = "date";
+
     const copy = document.createElement("button");
     copy.textContent = "⧉";
     copy.title = "Скопировать";
@@ -469,25 +488,20 @@
     const toggle = document.createElement("button");
     toggle.dataset.action = "toggle";
 
-    li.append(num, addr, copy, toggle);
-    paintItem(li, isUsed(v.address));
+    li.append(num, addr, date, copy, toggle);
+    paintItem(li, usedAt(v.index));
     return li;
   }
 
-  function paintItem(li, value) {
-    li.classList.toggle("used", value);
+  function paintItem(li, ts) {
+    li.classList.toggle("used", !!ts);
+    li.querySelector(".date").textContent = ts ? formatDate(ts, true) : "";
     const toggle = li.querySelector('[data-action="toggle"]');
-    toggle.textContent = value ? "↺" : "✓";
-    toggle.title = value ? "Вернуть" : "Отметить использованной";
+    toggle.textContent = ts ? "↺" : "✓";
+    toggle.title = ts ? "Вернуть" : "Отметить использованной";
     toggle.setAttribute("aria-label", toggle.title);
   }
 
-  function markItem(address, value) {
-    const li = document.querySelector('li[data-address="' + CSS.escape(address) + '"]');
-    if (li) paintItem(li, value);
-  }
-
-  // The artifact viewer blocks confirm(), so confirmations live in the page.
   let confirmAction = null;
   function askConfirm(text, yesLabel, action) {
     confirmAction = action;
@@ -523,43 +537,40 @@
     els.toast.textContent = text;
     els.toast.classList.add("show");
     clearTimeout(toastTimer);
-    toastTimer = setTimeout(() => els.toast.classList.remove("show"), 1800);
+    toastTimer = setTimeout(() => els.toast.classList.remove("show"), 2200);
   }
 
   // ---------- events ----------
-  els.saveBtn.addEventListener("click", async () => {
+  els.saveBtn.addEventListener("click", () => {
     const email = normalize(els.emailInput.value);
     if (!email) { els.error.textContent = "Похоже, это не почта. Пример: name@gmail.com"; return; }
-    els.saveBtn.disabled = true;
-    try {
-      await store.saveCurrent(email);
-    } catch (e) {
-      showToast("Не удалось сохранить почту, проверь соединение");
-    } finally {
-      els.saveBtn.disabled = false;
-    }
-    current = email;
-    used = [];
-    showApp();
-    watchCurrent();
+    writeLocal({ current: email });
+    openEmail(email);
   });
 
   els.emailInput.addEventListener("keydown", (e) => {
     if (e.key === "Enter") els.saveBtn.click();
   });
 
-  els.cancelBtn.addEventListener("click", showApp);
+  els.cancelBtn.addEventListener("click", () => openEmail(current));
 
   els.changeBtn.addEventListener("click", () => {
     askConfirm("Поменять почту? Отметки для текущей почты сохранятся.", "Поменять", showSetup);
   });
 
   els.resetBtn.addEventListener("click", () => {
-    askConfirm("Сбросить все отметки (" + used.length + ") для этой почты?", "Сбросить", () => {
+    const count = Object.keys(used).length;
+    askConfirm("Сбросить все отметки (" + count + ") для этой почты?", "Сбросить", async () => {
       hideConfirm();
-      applyUsed([]);
-      persistUsed();
-      showToast("Отметки сброшены");
+      const before = used;
+      applyUsed({});
+      try {
+        await request(usedUrl(current), "DELETE");
+        showToast("Отметки сброшены");
+      } catch (e) {
+        applyUsed(before);
+        showToast("Не удалось сбросить, проверь интернет");
+      }
     });
   });
 
@@ -571,7 +582,7 @@
   });
 
   els.useNextBtn.addEventListener("click", () => {
-    if (nextVariant) setUsed(nextVariant.address, true);
+    if (nextVariant) setUsed(nextVariant.index, true);
   });
 
   els.moreBtn.addEventListener("click", () => { renderMore(); refreshNext(); });
@@ -579,18 +590,22 @@
   els.groups.addEventListener("click", (e) => {
     const btn = e.target.closest("button[data-action]");
     if (!btn) return;
-    const address = btn.closest("li").dataset.address;
-    if (btn.dataset.action === "copy") copyText(address);
-    else setUsed(address, !isUsed(address));
+    const li = btn.closest("li");
+    if (btn.dataset.action === "copy") copyText(li.dataset.address);
+    else setUsed(Number(li.dataset.index), !usedAt(li.dataset.index));
   });
 
   // ---------- start ----------
   (async function start() {
-    store = await openStore();
-    try { current = await store.loadCurrent(); } catch (e) { current = null; }
-    if (!current) { showSetup(); return; }
-    showApp();
-    watchCurrent();
+    showLoading("Подключаюсь к базе…");
+    try {
+      dbUrl = await resolveDb();
+    } catch (e) {
+      showLoading("Не получилось подключиться к базе Firebase. Проверь интернет и правила базы (раздел Rules), потом обнови страницу.");
+      return;
+    }
+    const saved = readLocal().current;
+    if (saved) openEmail(saved); else showSetup();
   })();
 })();
 </script>
