@@ -1,6 +1,6 @@
 {
-  "name": "Варианты почты",
-  "short_name": "Почта",
+  "name": "DotMail",
+  "short_name": "DotMail",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
