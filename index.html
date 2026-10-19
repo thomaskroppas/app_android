@@ -2,8 +2,8 @@
 <html lang="ru">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="theme-color" content="#2563eb">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#F3F2F7">
 <title>Варианты почты</title>
 <link rel="icon" type="image/svg+xml" href="icons/icon.svg">
 <link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
@@ -14,153 +14,270 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="DotMail">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600;700&display=swap">
 <style>
+  /* Spec v1 · 19.10.2026: single column, 390 px reference width, max 480 px on desktop. */
   :root {
-    --bg: #f5f6f8; --card: #fff; --text: #111827; --muted: #6b7280;
-    --border: #e5e7eb; --accent: #2563eb; --accent-text: #fff;
-    --used-bg: #f0fdf4; --used-text: #15803d; --danger: #dc2626;
-  }
-  @media (prefers-color-scheme: dark) {
-    :root:not([data-theme="light"]) {
-      --bg: #0f1115; --card: #181b22; --text: #e5e7eb; --muted: #9ca3af;
-      --border: #2a2f3a; --accent: #3b82f6; --accent-text: #fff;
-      --used-bg: #13261a; --used-text: #4ade80; --danger: #f87171;
-      color-scheme: dark;
-    }
-  }
-  :root[data-theme="dark"] {
-    --bg: #0f1115; --card: #181b22; --text: #e5e7eb; --muted: #9ca3af;
-    --border: #2a2f3a; --accent: #3b82f6; --accent-text: #fff;
-    --used-bg: #13261a; --used-text: #4ade80; --danger: #f87171;
-    color-scheme: dark;
+    --bg: #F3F2F7; --surface: #FFFFFF; --field: #F7F6FA;
+    --ink: #121117; --ink-2: #2A2833; --muted: #6E6B7A; --subtle: #8A8699; --faint: #A3A0AD;
+    --line: #E6E4EE; --divider: #F0EEF4; --track: #E8E6EF;
+    --accent: #6B2EE8; --accent-soft: #F1EBFE; --accent-tint: #ECE5FD; --accent-on-dark: #B99BFF;
+    --progress: #8B5CF6; --disabled: #CFC8E0; --hero-caption: #A9A5B8;
+    --success: #1E7A44; --success-bg: #E3F5EA;
+    --danger: #D93A4A; --danger-bg: #FDECEE; --danger-ink: #7A1C27;
+    --font: "Onest", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    --mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    --ease: cubic-bezier(.2, .8, .2, 1);
+    color-scheme: light;
   }
   * { box-sizing: border-box; }
+  html, body { margin: 0; }
   body {
-    margin: 0; background: var(--bg); color: var(--text);
-    font: 16px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg); color: var(--ink);
+    font: 400 14px/1.4 var(--font);
+    -webkit-font-smoothing: antialiased; -webkit-tap-highlight-color: transparent;
   }
-  header {
-    position: sticky; top: env(safe-area-inset-top, 0px); z-index: 2; background: var(--card);
-    border-bottom: 1px solid var(--border);
-    display: flex; align-items: center; justify-content: space-between;
-    padding: 10px 16px; gap: 12px;
-  }
-  header h1 { font-size: 17px; margin: 0; }
-  body::before {
-    content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px);
-    z-index: 10; background: var(--card);
-  }
-  button.danger { color: var(--danger); }
-  .confirm { border-color: var(--danger); }
-  .confirm p { margin: 0 0 12px; }
-  .sync { margin: 10px 0 0; }
-  main { max-width: 640px; margin: 0 auto; padding: 16px; }
-  button {
-    font: inherit; border: 1px solid var(--border); background: var(--card);
-    color: var(--text); border-radius: 10px; padding: 8px 14px; cursor: pointer;
-  }
-  button.primary { background: var(--accent); color: var(--accent-text); border-color: var(--accent); }
-  button:disabled { opacity: .5; cursor: default; }
-  .card {
-    background: var(--card); border: 1px solid var(--border);
-    border-radius: 14px; padding: 16px; margin-bottom: 16px;
-  }
-  input[type=email] {
-    width: 100%; font: inherit; padding: 12px; border-radius: 10px;
-    border: 1px solid var(--border); background: var(--bg); color: var(--text);
-    margin: 8px 0 12px;
-  }
-  .error { color: var(--danger); font-size: 14px; min-height: 1em; }
-  .muted { color: var(--muted); font-size: 14px; }
-  .next-email {
-    font: 600 18px/1.3 ui-monospace, SFMono-Regular, Menlo, monospace;
-    word-break: break-all; margin: 8px 0 14px;
-  }
-  .row { display: flex; gap: 8px; flex-wrap: wrap; }
-  .group-title { font-weight: 600; margin: 18px 0 6px; }
-  ul { list-style: none; margin: 0; padding: 0; }
-  li {
-    display: flex; align-items: center; gap: 6px;
-    padding: 8px 6px; border-bottom: 1px solid var(--border);
-  }
-  li:last-child { border-bottom: 0; }
-  li .num { color: var(--muted); font-size: 12px; min-width: 2.4em; text-align: right; }
-  li .addr { flex: 1; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 13px; word-break: break-all; }
-  li.used { background: var(--used-bg); }
-  li.used .addr { color: var(--used-text); text-decoration: line-through; }
-  li.current { outline: 2px solid var(--accent); outline-offset: -2px; border-radius: 8px; }
-  li .date { color: var(--used-text); font-size: 12px; white-space: nowrap; font-variant-numeric: tabular-nums; }
-  .last { font-weight: 600; color: var(--text); }
-  li button { padding: 4px 0; width: 34px; font-size: 15px; flex-shrink: 0; }
-  .list { padding: 4px 0; }
-  .more { display: block; width: 100%; margin-top: 12px; }
-  .toast {
-    position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%);
-    background: var(--text); color: var(--bg); padding: 8px 16px; border-radius: 20px;
-    font-size: 14px; opacity: 0; transition: opacity .2s; pointer-events: none;
-  }
-  .toast.show { opacity: 1; }
   [hidden] { display: none !important; }
+  button { font: inherit; color: inherit; border: 0; background: none; padding: 0; cursor: pointer; }
+  button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  .screen {
+    max-width: 480px; margin: 0 auto; min-height: 100vh; min-height: 100dvh;
+    padding-top: calc(env(safe-area-inset-top, 0px) + 16px);
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+    padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 24px);
+    display: flex; flex-direction: column; gap: 14px;
+  }
+
+  /* ---------- buttons ---------- */
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center;
+    height: 52px; padding: 0 22px; border-radius: 999px;
+    font: 600 15px/1 var(--font); transition: transform .12s, background .12s;
+  }
+  .btn:active:not(:disabled) { transform: scale(.97); }
+  .btn-primary { background: var(--accent); color: #fff; }
+  .btn-primary:disabled { background: var(--disabled); cursor: default; }
+  .btn-secondary { background: var(--surface); color: var(--ink); }
+  .btn-l { height: 58px; font-size: 17px; width: 100%; }
+  .btn-small { height: 40px; padding: 0 16px; font: 500 14px/1 var(--font); }
+  .btn-danger { background: var(--danger); color: #fff; }
+  .link-danger { color: var(--danger); font: 500 14px/1 var(--font); padding: 8px 0; }
+
+  /* ---------- setup ---------- */
+  #setup { padding-left: max(20px, env(safe-area-inset-left, 0px)); padding-right: max(20px, env(safe-area-inset-right, 0px)); }
+  .eyebrow { color: var(--muted); font: 500 13px/1.4 var(--font); margin: 16px 0 0; }
+  .display { font: 600 32px/1.12 var(--font); letter-spacing: -0.02em; margin: 0 0 8px; text-wrap: balance; }
+  .card { background: var(--surface); border-radius: 24px; padding: 18px; display: flex; flex-direction: column; gap: 10px; }
+  .field-label { color: var(--muted); font: 500 13px/1.4 var(--font); }
+  .field {
+    width: 100%; height: 56px; padding: 0 16px; border-radius: 16px;
+    background: var(--field); border: 1px solid var(--line); color: var(--ink);
+    font: 500 17px/1 var(--mono); outline: none; transition: border-color .12s, background .12s;
+  }
+  .field::placeholder { color: var(--faint); }
+  .field:focus { border-color: var(--accent); background: var(--surface); }
+  .field:focus-visible { outline: none; }
+  .caption { color: var(--muted); font: 400 13px/1.4 var(--font); margin: 0; }
+  .caption.error { color: var(--danger); }
+  .preview { background: var(--ink); color: #fff; border-radius: 24px; padding: 20px; display: flex; flex-direction: column; gap: 10px; }
+  .preview-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+  .preview-head span { color: var(--hero-caption); font: 500 13px/1.4 var(--font); }
+  .preview-head b { font: 600 26px/1.1 var(--font); letter-spacing: -0.02em; }
+  .preview-list { display: flex; flex-direction: column; gap: 8px; font: 400 13.5px/1.3 var(--mono); word-break: break-all; }
+  .setup-spacer { flex: 1; }
+
+  /* ---------- main header ---------- */
+  .top { display: flex; align-items: center; gap: 12px; }
+  .avatar {
+    width: 44px; height: 44px; border-radius: 50%; flex-shrink: 0;
+    background: var(--accent-tint); color: var(--accent);
+    display: grid; place-items: center; font: 600 17px/1 var(--font); text-transform: uppercase;
+  }
+  .who { flex: 1; min-width: 0; }
+  .who small { display: block; color: var(--muted); font: 500 13px/1.3 var(--font); }
+  .who b { display: block; font: 600 15px/1.3 var(--font); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  /* ---------- hero ---------- */
+  .hero { background: var(--ink); color: #fff; border-radius: 28px; padding: 20px; display: flex; flex-direction: column; gap: 14px; }
+  .hero-meta { display: flex; justify-content: space-between; gap: 12px; color: var(--hero-caption); font: 500 13px/1.3 var(--font); font-variant-numeric: tabular-nums; }
+  .hero-addr { font: 600 21px/1.3 var(--mono); word-break: break-all; min-height: 1.3em; }
+  .hero-addr .dot { color: var(--accent-on-dark); }
+  .hero-addr .domain { color: var(--subtle); font-weight: 500; }
+  .hero-addr.done { font-family: var(--font); }
+  .progress { height: 6px; border-radius: 3px; background: var(--ink-2); overflow: hidden; }
+  .progress i { display: block; height: 100%; width: 0; background: var(--progress); border-radius: 3px; transition: width .24s var(--ease); }
+  .hero-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .hero-actions .btn { width: 100%; height: 54px; padding: 0 12px; }
+  .hero-actions .btn-secondary:disabled { opacity: .5; cursor: default; }
+
+  .last-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding: 0 2px; }
+  .last-row p { margin: 0; color: var(--muted); font: 400 14px/1.4 var(--font); }
+  .last-row p b { color: var(--ink); font-weight: 600; }
+  .last-row .link-danger { padding: 0; flex-shrink: 0; line-height: 1.4; }
+  .last-row .link-danger:disabled { opacity: .4; cursor: default; }
+
+  .confirm { background: var(--danger-bg); border-radius: 20px; padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+  .confirm p { margin: 0; color: var(--danger-ink); font: 500 15px/1.35 var(--font); }
+  .confirm .actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .confirm .btn { width: 100%; }
+
+  /* ---------- segmented filter ---------- */
+  .segments { display: grid; grid-template-columns: repeat(3, auto); background: var(--track); border-radius: 999px; padding: 4px; height: 44px; }
+  .segments button {
+    height: 36px; border-radius: 999px; padding: 0 8px; white-space: nowrap;
+    color: var(--muted); font: 500 14px/1 var(--font); font-variant-numeric: tabular-nums;
+    transition: background .12s, color .12s;
+  }
+  .segments button[aria-pressed="true"] { background: var(--surface); color: var(--ink); font-weight: 600; box-shadow: 0 1px 2px rgba(18,17,23,.06); }
+
+  /* ---------- list ---------- */
+  .groups { display: flex; flex-direction: column; gap: 14px; }
+  .group-head { display: flex; justify-content: space-between; align-items: baseline; padding: 4px 2px 8px; }
+  .group-head b { font: 600 15px/1.3 var(--font); }
+  .group-head span { color: var(--subtle); font: 500 12px/1 var(--font); font-variant-numeric: tabular-nums; }
+  .list { background: var(--surface); border-radius: 22px; overflow: hidden; list-style: none; margin: 0; padding: 0; }
+  .row { display: flex; align-items: center; gap: 8px; padding: 8px 8px 8px 14px; min-height: 56px; border-top: 1px solid var(--divider); }
+  .row:first-child { border-top: 0; }
+  .row .num { width: 32px; flex-shrink: 0; color: var(--faint); font: 500 11px/1 var(--mono); font-variant-numeric: tabular-nums; }
+  .row .addr { flex: 1; min-width: 0; font: 400 13.5px/1.3 var(--mono); word-break: break-all; }
+  .row .addr .dot { color: var(--accent); font-weight: 700; }
+  .row.next { background: var(--accent-soft); }
+  .row.next .num { color: var(--accent); }
+  .row.next .addr { font-weight: 600; }
+  .row.used .addr { color: var(--faint); text-decoration: line-through; }
+  .row.used .addr .dot { color: inherit; font-weight: 400; }
+  .badge { flex-shrink: 0; background: var(--success-bg); color: var(--success); border-radius: 10px; padding: 4px 8px; font: 500 11px/1 var(--font); font-variant-numeric: tabular-nums; }
+  .icon-btn {
+    width: 40px; height: 40px; border-radius: 50%; flex-shrink: 0;
+    display: grid; place-items: center; transition: transform .12s, background .12s;
+  }
+  .icon-btn:active { transform: scale(.94); }
+  .icon-btn svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+  .icon-copy { background: var(--field); color: var(--ink); }
+  .icon-check { background: var(--surface); border: 1px solid var(--line); color: var(--muted); }
+  .icon-undo { background: var(--field); color: var(--muted); }
+  .row.next .icon-copy { background: var(--surface); }
+  .row.next .icon-check { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .more { height: 48px; border-radius: 999px; background: var(--surface); color: var(--ink); font: 500 14px/1 var(--font); width: 100%; transition: transform .12s; }
+  .more:active { transform: scale(.98); }
+  .empty { background: var(--surface); border-radius: 22px; padding: 22px 18px; color: var(--muted); font: 400 14px/1.4 var(--font); text-align: center; }
+
+  /* ---------- status / loading ---------- */
+  .status-card { background: var(--surface); border-radius: 24px; padding: 22px 18px; color: var(--muted); font: 400 14px/1.45 var(--font); margin-top: 40px; }
+
+  /* ---------- toast ---------- */
+  .toast {
+    position: fixed; left: 50%; top: calc(env(safe-area-inset-top, 0px) + 14px); z-index: 30;
+    transform: translate(-50%, -8px); opacity: 0; pointer-events: none;
+    background: var(--ink); color: #fff; border-radius: 999px; padding: 11px 18px;
+    font: 500 14px/1 var(--font); white-space: nowrap; max-width: calc(100vw - 32px); overflow: hidden; text-overflow: ellipsis;
+    transition: opacity .18s, transform .18s var(--ease);
+  }
+  .toast.show { opacity: 1; transform: translate(-50%, 0); }
+
+  /* ---------- bottom sheet ---------- */
+  .backdrop { position: fixed; inset: 0; z-index: 20; background: rgba(18,17,23,.4); opacity: 0; transition: opacity .24s var(--ease); }
+  .backdrop.open { opacity: 1; }
+  .sheet {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 21; margin: 0 auto; max-width: 480px;
+    background: var(--surface); border-radius: 32px 32px 0 0;
+    padding: 12px max(20px, env(safe-area-inset-right, 0px)) calc(env(safe-area-inset-bottom, 0px) + 36px) max(20px, env(safe-area-inset-left, 0px));
+    display: flex; flex-direction: column; gap: 14px;
+    transform: translateY(100%); transition: transform .24s var(--ease);
+  }
+  .sheet.open { transform: translateY(0); }
+  .handle { width: 40px; height: 5px; border-radius: 3px; background: var(--line); align-self: center; }
+  .title { font: 600 22px/1.2 var(--font); letter-spacing: -0.01em; margin: 0; }
+  .sheet .btn-primary { height: 56px; width: 100%; font-size: 17px; }
+
+  @media (prefers-reduced-motion: reduce) { *, *::before, *::after { transition: none !important; } }
 </style>
 </head>
 <body>
-<header>
-  <h1>Варианты почты</h1>
-  <button id="changeBtn" hidden>Поменять почту</button>
-</header>
 
-<main>
-  <section id="setup" class="card" hidden>
-    <label for="emailInput"><b>Введи почту</b></label>
-    <input id="emailInput" type="email" placeholder="name@gmail.com" autocomplete="email" inputmode="email">
-    <div class="row">
-      <button id="saveBtn" class="primary">Сохранить</button>
-      <button id="cancelBtn" hidden>Отмена</button>
-    </div>
-    <p class="error" id="error"></p>
-    <p class="muted">Точки, которые уже есть в почте, убираются.</p>
-  </section>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
 
-  <section id="loading" class="card" hidden>
-    <p class="muted">Загружаю отметки…</p>
-  </section>
-
-  <section id="confirmBox" class="card confirm" hidden>
-    <p id="confirmText"></p>
-    <div class="row">
-      <button id="confirmYes" class="primary"></button>
-      <button id="confirmNo">Отмена</button>
-    </div>
-  </section>
-
-  <section id="app" hidden>
-    <div class="card">
-      <div class="muted">Следующая почта <span id="nextNum"></span></div>
-      <div class="next-email" id="nextEmail"></div>
-      <div class="row">
-        <button id="copyNextBtn" class="primary">Скопировать</button>
-        <button id="useNextBtn">Отметить использованной</button>
-        <button id="resetBtn" class="danger">Сбросить</button>
-      </div>
-      <p class="muted"><span class="last" id="lastUsed"></span></p>
-      <p class="muted" id="stats"></p>
-    </div>
-
-    <div class="card list">
-      <div id="groups"></div>
-      <button id="moreBtn" class="more">Показать ещё</button>
-    </div>
-  </section>
+<main class="screen" id="loading">
+  <div class="status-card" id="loadingText">Подключаюсь к базе…</div>
 </main>
 
-<div class="toast" id="toast"></div>
+<main class="screen" id="setup" hidden>
+  <p class="eyebrow">Варианты почты</p>
+  <h1 class="display">Введи почту, и мы соберём все варианты с точками</h1>
+  <div class="card">
+    <label class="field-label" for="emailInput">Gmail-адрес</label>
+    <input class="field" id="emailInput" type="text" placeholder="name@gmail.com"
+      inputmode="email" autocapitalize="off" autocorrect="off" autocomplete="email" spellcheck="false">
+    <p class="caption" id="setupHint">Точки, которые уже есть в почте, убираются.</p>
+  </div>
+  <div class="preview" id="preview" hidden>
+    <div class="preview-head"><span>Получится</span><b id="previewCount"></b></div>
+    <div class="preview-list" id="previewList"></div>
+  </div>
+  <div class="setup-spacer"></div>
+  <button class="btn btn-primary btn-l" id="saveBtn" disabled>Сохранить</button>
+</main>
+
+<main class="screen" id="app" hidden>
+  <header class="top">
+    <div class="avatar" id="avatar" aria-hidden="true"></div>
+    <div class="who"><small>Варианты почты</small><b id="currentEmail"></b></div>
+    <button class="btn btn-secondary btn-small" id="changeBtn">Сменить</button>
+  </header>
+
+  <section class="hero" aria-label="Следующая почта">
+    <div class="hero-meta"><span id="nextLabel"></span><span id="progressLabel"></span></div>
+    <div class="hero-addr" id="nextEmail"></div>
+    <div class="progress" aria-hidden="true"><i id="progressBar"></i></div>
+    <div class="hero-actions">
+      <button class="btn btn-primary" id="copyNextBtn">Скопировать</button>
+      <button class="btn btn-secondary" id="useNextBtn">Использована</button>
+    </div>
+  </section>
+
+  <div class="last-row">
+    <p id="lastUsed"></p>
+    <button class="link-danger" id="resetBtn">Сбросить</button>
+  </div>
+
+  <section class="confirm" id="confirmBox" hidden>
+    <p>Сбросить все отметки для этой почты?</p>
+    <div class="actions">
+      <button class="btn btn-secondary" id="confirmNo">Отмена</button>
+      <button class="btn btn-danger" id="confirmYes">Сбросить</button>
+    </div>
+  </section>
+
+  <nav class="segments" aria-label="Фильтр">
+    <button data-filter="all" aria-pressed="true" id="segAll"></button>
+    <button data-filter="free" aria-pressed="false" id="segFree"></button>
+    <button data-filter="used" aria-pressed="false" id="segUsed"></button>
+  </nav>
+
+  <div class="groups" id="groups"></div>
+  <button class="more" id="moreBtn" hidden></button>
+</main>
+
+<div class="backdrop" id="backdrop" hidden></div>
+<section class="sheet" id="sheet" hidden aria-label="Новая почта">
+  <div class="handle"></div>
+  <h2 class="title">Новая почта</h2>
+  <input class="field" id="sheetInput" type="text" placeholder="name@gmail.com"
+    inputmode="email" autocapitalize="off" autocorrect="off" autocomplete="email" spellcheck="false">
+  <p class="caption" id="sheetHint">Точки, которые уже есть в почте, убираются.</p>
+  <button class="btn btn-primary" id="sheetSave" disabled>Сохранить</button>
+</section>
 
 <script>
 (function () {
   "use strict";
 
   // Firebase Realtime Database of the "mail-randomizer-github" project.
-  // Marks live at emails/<email key>/used/<variant number> = timestamp (ms).
+  // Marks live at emails/<email key>/used/<variant index> = timestamp (ms).
   const DB_NAME = "mail-randomizer-github-default-rtdb";
   const DB_CANDIDATES = [
     "https://" + DB_NAME + ".firebaseio.com",
@@ -168,8 +285,17 @@
     "https://" + DB_NAME + ".asia-southeast1.firebasedatabase.app",
   ];
   const LOCAL_KEY = "dotEmails.v2";
-  const PAGE_SIZE = 300;
+  const PAGE_SIZE = 40;
+  const TOAST_MS = 1600;
   const DAY_MS = 24 * 60 * 60 * 1000;
+  const DOMAIN = "@gmail.com";
+  const LOCAL_RE = /^[a-z0-9]{2,30}$/;
+
+  const ICONS = {
+    copy: '<svg viewBox="0 0 16 16"><rect x="5.5" y="5.5" width="8" height="8" rx="2"/><path d="M10.5 5.5V4a1.5 1.5 0 0 0-1.5-1.5H4A1.5 1.5 0 0 0 2.5 4v5A1.5 1.5 0 0 0 4 10.5h1.5"/></svg>',
+    check: '<svg viewBox="0 0 16 16"><path d="M3.5 8.5l3 3 6-7"/></svg>',
+    undo: '<svg viewBox="0 0 16 16"><path d="M4.5 3.5v3.5H8"/><path d="M4.9 7A4.5 4.5 0 1 1 3.6 10"/></svg>',
+  };
 
   // ---------- this device: which email is open, which db url works ----------
   function readLocal() {
@@ -236,16 +362,11 @@
     let data = {};
     function apply(kind, payload) {
       const path = payload.path.replace(/^\//, "");
-      if (kind === "put" && path === "") data = { ...(payload.data || {}) };
-      else if (kind === "put") {
-        const next = { ...data };
-        if (payload.data === null) delete next[path]; else next[path] = payload.data;
-        data = next;
-      } else if (kind === "patch") {
-        const next = { ...data };
-        Object.entries(payload.data || {}).forEach(([k, v]) => { if (v === null) delete next[k]; else next[k] = v; });
-        data = next;
-      }
+      const next = kind === "put" && path === "" ? {} : { ...data };
+      if (kind === "put" && path === "") Object.assign(next, payload.data || {});
+      else if (kind === "put") { if (payload.data === null) delete next[path]; else next[path] = payload.data; }
+      else Object.entries(payload.data || {}).forEach(([k, v]) => { if (v === null) delete next[k]; else next[k] = v; });
+      data = next;
       onChange(data);
     }
     source.addEventListener("put", (e) => apply("put", JSON.parse(e.data)));
@@ -257,272 +378,365 @@
   }
 
   // ---------- variants ----------
-  function normalize(input) {
-    const value = input.trim().toLowerCase();
-    const at = value.lastIndexOf("@");
-    if (at <= 0 || at === value.length - 1) return null;
-    const local = value.slice(0, at).replace(/\./g, "");
-    const domain = value.slice(at + 1);
-    if (!local || /\s/.test(local + domain) || !domain.includes(".")) return null;
-    return local + "@" + domain;
+  // Accepts "name", "na.me" or "na.me@gmail.com"; returns the local part without dots.
+  function parseLocal(input) {
+    const local = input.trim().toLowerCase().split("@")[0].replace(/\./g, "");
+    return LOCAL_RE.test(local) ? local : null;
   }
 
-  // Yields every dotted variant: first no dots, then all with 1 dot, 2 dots, ...
-  // Inside each group the dot positions go in lexicographic order:
-  // the first dot stays put while the last one moves right, then the previous one shifts.
-  function* variants(email) {
-    const at = email.lastIndexOf("@");
-    const local = email.slice(0, at);
-    const domain = email.slice(at);
-    const gaps = local.length - 1; // places between letters
-    let index = 0;
-    for (let k = 0; k <= gaps; k++) {
-      const pos = Array.from({ length: k }, (_, i) => i);
-      while (true) {
-        yield { index: index++, dots: k, address: build(local, pos) + domain };
-        let i = k - 1;
-        while (i >= 0 && pos[i] === gaps - k + i) i--;
-        if (i < 0) break;
-        pos[i]++;
-        for (let j = i + 1; j < k; j++) pos[j] = pos[j - 1] + 1;
+  const binomCache = {};
+  function binom(n, k) {
+    if (k < 0 || k > n) return 0;
+    const key = n + ":" + k;
+    if (binomCache[key] !== undefined) return binomCache[key];
+    let r = 1;
+    for (let i = 1; i <= k; i++) r = r * (n - k + i) / i;
+    return (binomCache[key] = Math.round(r));
+  }
+
+  // Order: by number of dots, then lexicographically by dot positions.
+  // unrank(index) returns the dot positions of the variant with that index.
+  function unrank(gaps, index) {
+    let k = 0;
+    let rest = index;
+    while (rest >= binom(gaps, k)) { rest -= binom(gaps, k); k++; }
+    const pos = [];
+    let start = 0;
+    for (let slot = 0; slot < k; slot++) {
+      for (let p = start; p < gaps; p++) {
+        const after = binom(gaps - p - 1, k - slot - 1);
+        if (rest < after) { pos.push(p); start = p + 1; break; }
+        rest -= after;
       }
     }
+    return { dots: k, pos: pos };
   }
 
-  function build(local, pos) {
-    let out = "";
-    let p = 0;
-    for (let i = 0; i < local.length; i++) {
-      out += local[i];
-      if (p < pos.length && pos[p] === i) { out += "."; p++; }
-    }
-    return out;
+  function variantAt(local, index) {
+    const v = unrank(local.length - 1, index);
+    return { index: index, dots: v.dots, parts: split(local, v.pos) };
   }
 
-  function totalCount(email) {
-    const localLen = email.lastIndexOf("@");
-    return Math.pow(2, Math.max(localLen - 1, 0));
+  // Pieces of the local part between the dots, e.g. ["ti", "mmykroppa"].
+  function split(local, pos) {
+    const parts = [];
+    let from = 0;
+    pos.forEach((p) => { parts.push(local.slice(from, p + 1)); from = p + 1; });
+    parts.push(local.slice(from));
+    return parts;
   }
 
-  // ---------- dates ----------
+  function totalCount(local) {
+    return Math.pow(2, local.length - 1);
+  }
+
+  // ---------- formatting ----------
+  const num = (n) => n.toLocaleString("ru-RU");
+
+  function plural(n, one, few, many) {
+    const m10 = n % 10, m100 = n % 100;
+    if (m10 === 1 && m100 !== 11) return one;
+    if (m10 >= 2 && m10 <= 4 && (m100 < 12 || m100 > 14)) return few;
+    return many;
+  }
+
+  function dotsLabel(k) {
+    return k === 0 ? "Без точек" : k + " " + plural(k, "точка", "точки", "точек");
+  }
+
   function formatDate(ts, short) {
     return new Date(ts).toLocaleDateString("ru-RU", { day: "2-digit", month: "2-digit", year: short ? "2-digit" : "numeric" });
   }
 
-  function daysAgo(ts) {
+  function dayDiff(ts) {
     const start = (d) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
-    const days = Math.round((start(new Date()) - start(new Date(ts))) / DAY_MS);
-    if (days <= 0) return "сегодня";
-    if (days === 1) return "вчера";
-    const mod10 = days % 10, mod100 = days % 100;
-    const word = mod10 === 1 && mod100 !== 11 ? "день"
-      : mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14) ? "дня" : "дней";
-    return days + " " + word + " назад";
+    return Math.round((start(new Date()) - start(new Date(ts))) / DAY_MS);
   }
 
-  // ---------- UI ----------
+  function fillAddress(el, parts, withDomain) {
+    el.textContent = "";
+    parts.forEach((part, i) => {
+      if (i > 0) {
+        const dot = document.createElement("span");
+        dot.className = "dot";
+        dot.textContent = ".";
+        el.appendChild(dot);
+      }
+      el.appendChild(document.createTextNode(part));
+    });
+    if (withDomain) {
+      const domain = document.createElement("span");
+      domain.className = "domain";
+      domain.textContent = DOMAIN;
+      el.appendChild(domain);
+    }
+  }
+
+  // ---------- state ----------
   const $ = (id) => document.getElementById(id);
   const els = {
-    loading: $("loading"), setup: $("setup"), app: $("app"), changeBtn: $("changeBtn"),
-    emailInput: $("emailInput"), saveBtn: $("saveBtn"), cancelBtn: $("cancelBtn"), error: $("error"),
-    nextEmail: $("nextEmail"), nextNum: $("nextNum"), copyNextBtn: $("copyNextBtn"),
-    useNextBtn: $("useNextBtn"), resetBtn: $("resetBtn"), stats: $("stats"), lastUsed: $("lastUsed"),
+    loading: $("loading"), loadingText: $("loadingText"), setup: $("setup"), app: $("app"),
+    emailInput: $("emailInput"), setupHint: $("setupHint"), saveBtn: $("saveBtn"),
+    preview: $("preview"), previewCount: $("previewCount"), previewList: $("previewList"),
+    avatar: $("avatar"), currentEmail: $("currentEmail"), changeBtn: $("changeBtn"),
+    nextLabel: $("nextLabel"), progressLabel: $("progressLabel"), nextEmail: $("nextEmail"), progressBar: $("progressBar"),
+    copyNextBtn: $("copyNextBtn"), useNextBtn: $("useNextBtn"),
+    lastUsed: $("lastUsed"), resetBtn: $("resetBtn"),
+    confirmBox: $("confirmBox"), confirmYes: $("confirmYes"), confirmNo: $("confirmNo"),
+    segAll: $("segAll"), segFree: $("segFree"), segUsed: $("segUsed"),
     groups: $("groups"), moreBtn: $("moreBtn"), toast: $("toast"),
-    confirmBox: $("confirmBox"), confirmText: $("confirmText"), confirmYes: $("confirmYes"), confirmNo: $("confirmNo"),
+    backdrop: $("backdrop"), sheet: $("sheet"), sheetInput: $("sheetInput"), sheetHint: $("sheetHint"), sheetSave: $("sheetSave"),
   };
 
-  let current = null;
-  let used = {}; // variant index -> timestamp when it was marked
+  let local = null;           // current local part, without dots
+  let used = {};              // variant index -> timestamp when it was marked
+  let filter = "all";
+  let shown = 0;              // rows rendered for the current filter
+  let nextIndex = null;
   let stopWatching = () => {};
-  let iterator = null;
-  let rendered = 0;
-  let lastGroup = -1;
-  let currentList = null;
-  let nextVariant = null;
 
-  function usedAt(index) {
-    return used[index] || null;
+  const isUsed = (i) => used[i] !== undefined && used[i] !== null;
+  const usedCount = () => Object.keys(used).length;
+  const email = () => local + DOMAIN;
+
+  function findNext() {
+    const total = totalCount(local);
+    for (let i = 0; i < total; i++) if (!isUsed(i)) return i;
+    return null;
   }
 
+  // Returns a function that yields the next variant index for the current filter, or null at the end.
+  function makeCursor() {
+    const total = totalCount(local);
+    if (filter === "used") {
+      const list = Object.keys(used).map(Number).sort((a, b) => a - b);
+      let j = 0;
+      return () => (j < list.length ? list[j++] : null);
+    }
+    let i = 0;
+    return () => {
+      while (filter === "free" && i < total && isUsed(i)) i++;
+      return i < total ? i++ : null;
+    };
+  }
+
+  function filterTotal() {
+    const total = totalCount(local);
+    if (filter === "used") return usedCount();
+    if (filter === "free") return total - usedCount();
+    return total;
+  }
+
+  // ---------- screens ----------
+  function show(screen) {
+    els.loading.hidden = screen !== "loading";
+    els.setup.hidden = screen !== "setup";
+    els.app.hidden = screen !== "app";
+  }
+
+  function showSetup() {
+    show("setup");
+    els.emailInput.value = "";
+    updateSetup();
+    els.emailInput.focus();
+  }
+
+  function hintFor(raw, parsed, hintEl) {
+    const bad = !parsed && raw.trim().length > 0;
+    hintEl.classList.toggle("error", bad);
+    hintEl.textContent = bad
+      ? "Только латинские буквы и цифры, от 2 до 30 символов."
+      : "Точки, которые уже есть в почте, убираются.";
+  }
+
+  function updateSetup() {
+    const raw = els.emailInput.value;
+    const parsed = parseLocal(raw);
+    els.saveBtn.disabled = !parsed;
+    els.preview.hidden = !parsed;
+    hintFor(raw, parsed, els.setupHint);
+    if (!parsed) return;
+    const total = totalCount(parsed);
+    els.previewCount.textContent = num(total) + " " + plural(total, "вариант", "варианта", "вариантов");
+    const examples = [0, 1, Math.min(total - 1, 1 + Math.floor((parsed.length - 1) / 2))]
+      .filter((v, i, a) => a.indexOf(v) === i);
+    els.previewList.textContent = "";
+    examples.forEach((i) => {
+      const row = document.createElement("div");
+      row.textContent = variantAt(parsed, i).parts.join(".") + DOMAIN;
+      els.previewList.appendChild(row);
+    });
+  }
+
+  function openEmail(newLocal) {
+    local = newLocal;
+    used = {};
+    filter = "all";
+    els.confirmBox.hidden = true;
+    els.avatar.textContent = local[0];
+    els.currentEmail.textContent = email();
+    show("app");
+    renderAll(false);
+    stopWatching();
+    stopWatching = watchUsed(email(), applyUsed, showToast);
+  }
+
+  function applyUsed(map) {
+    used = map;
+    renderAll(true);
+  }
+
+  // ---------- render ----------
+  function renderAll(keepLength) {
+    nextIndex = findNext();
+    renderHero();
+    renderSegments();
+    renderList(keepLength ? Math.max(shown, PAGE_SIZE) : PAGE_SIZE);
+  }
+
+  function renderHero() {
+    const total = totalCount(local);
+    const count = usedCount();
+    els.progressLabel.textContent = num(count) + " из " + num(total);
+    els.progressBar.style.width = count ? Math.max(1.5, (count / total) * 100) + "%" : "0";
+    els.nextEmail.classList.toggle("done", nextIndex === null);
+    if (nextIndex === null) {
+      els.nextLabel.textContent = "Следующая";
+      els.nextEmail.textContent = "Все использованы";
+    } else {
+      els.nextLabel.textContent = "Следующая · №" + (nextIndex + 1);
+      fillAddress(els.nextEmail, variantAt(local, nextIndex).parts, true);
+    }
+    els.copyNextBtn.disabled = nextIndex === null;
+    els.useNextBtn.disabled = nextIndex === null;
+    els.resetBtn.disabled = count === 0;
+    renderLastUsed();
+  }
+
+  function renderLastUsed() {
+    const stamps = Object.values(used);
+    els.lastUsed.textContent = "";
+    if (!stamps.length) { els.lastUsed.textContent = "Последняя регистрация: ещё не было"; return; }
+    const last = Math.max.apply(null, stamps);
+    const diff = dayDiff(last);
+    const date = document.createElement("b");
+    date.textContent = formatDate(last);
+    els.lastUsed.append("Последняя регистрация: ", date, diff === 0 ? " (сегодня)" : diff === 1 ? " (вчера)" : "");
+  }
+
+  function renderSegments() {
+    const total = totalCount(local);
+    const count = usedCount();
+    els.segAll.textContent = "Все " + num(total);
+    els.segFree.textContent = "Свободные " + num(total - count);
+    els.segUsed.textContent = "Отмеченные " + num(count);
+    [els.segAll, els.segFree, els.segUsed].forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.filter === filter)));
+  }
+
+  function renderList(limit) {
+    els.groups.textContent = "";
+    shown = 0;
+    const next = makeCursor();
+    let list = null;
+    let group = -1;
+    while (shown < limit) {
+      const index = next();
+      if (index === null) break;
+      const v = variantAt(local, index);
+      if (v.dots !== group) {
+        group = v.dots;
+        list = appendGroup(v.dots);
+      }
+      list.appendChild(renderRow(v));
+      shown++;
+    }
+    if (!shown) {
+      const empty = document.createElement("div");
+      empty.className = "empty";
+      empty.textContent = filter === "used" ? "Отмеченных вариантов пока нет." : "Свободных вариантов не осталось.";
+      els.groups.appendChild(empty);
+    }
+    const left = filterTotal() - shown;
+    els.moreBtn.hidden = left <= 0;
+    els.moreBtn.textContent = "Показать ещё · осталось " + num(left);
+  }
+
+  function appendGroup(dots) {
+    const wrap = document.createElement("section");
+    const head = document.createElement("div");
+    head.className = "group-head";
+    const title = document.createElement("b");
+    title.textContent = dotsLabel(dots);
+    const count = document.createElement("span");
+    count.textContent = num(binom(local.length - 1, dots));
+    head.append(title, count);
+    const list = document.createElement("ul");
+    list.className = "list";
+    wrap.append(head, list);
+    els.groups.appendChild(wrap);
+    return list;
+  }
+
+  function iconButton(kind, label, action) {
+    const b = document.createElement("button");
+    b.className = "icon-btn icon-" + kind;
+    b.innerHTML = ICONS[kind];
+    b.title = label;
+    b.setAttribute("aria-label", label);
+    b.dataset.action = action;
+    return b;
+  }
+
+  function renderRow(v) {
+    const li = document.createElement("li");
+    li.className = "row";
+    li.dataset.index = v.index;
+    const n = document.createElement("span");
+    n.className = "num";
+    n.textContent = v.index + 1;
+    const addr = document.createElement("span");
+    addr.className = "addr";
+    fillAddress(addr, v.parts, false);
+    li.append(n, addr);
+    if (isUsed(v.index)) {
+      li.classList.add("used");
+      const badge = document.createElement("span");
+      badge.className = "badge";
+      badge.textContent = formatDate(used[v.index], true);
+      li.append(badge, iconButton("undo", "Вернуть", "undo"));
+    } else {
+      if (v.index === nextIndex) li.classList.add("next");
+      li.append(iconButton("copy", "Скопировать", "copy"), iconButton("check", "Отметить использованной", "mark"));
+    }
+    return li;
+  }
+
+  // ---------- actions ----------
   async function setUsed(index, value) {
     const before = used;
     const next = { ...used };
     if (value) next[index] = Date.now(); else delete next[index];
     applyUsed(next);
+    if (value) showToast("№" + (index + 1) + " отмечена");
     try {
-      await request(usedUrl(current, index), value ? "PUT" : "DELETE", value ? next[index] : undefined);
+      await request(usedUrl(email(), index), value ? "PUT" : "DELETE", value ? next[index] : undefined);
     } catch (e) {
       applyUsed(before);
-      showToast("Не удалось сохранить отметку, проверь интернет");
+      showToast("Не удалось сохранить, проверь интернет");
     }
   }
 
-  function findNext() {
-    for (const v of variants(current)) {
-      if (!usedAt(v.index)) return v;
-    }
-    return null;
-  }
-
-  function showLoading(text) {
-    els.loading.querySelector("p").textContent = text;
-    els.loading.hidden = false;
-    els.setup.hidden = true;
-    els.app.hidden = true;
-  }
-
-  function showSetup() {
-    hideConfirm();
-    els.loading.hidden = true;
-    els.setup.hidden = false;
-    els.app.hidden = true;
-    els.changeBtn.hidden = true;
-    els.cancelBtn.hidden = !current;
-    els.emailInput.value = "";
-    els.error.textContent = "";
-    els.emailInput.focus();
-  }
-
-  function openEmail(email) {
-    hideConfirm();
-    current = email;
-    used = {};
-    els.loading.hidden = true;
-    els.setup.hidden = true;
-    els.app.hidden = false;
-    els.changeBtn.hidden = false;
-    renderList();
-    stopWatching();
-    stopWatching = watchUsed(email, applyUsed, showToast);
-  }
-
-  // Repaints marks in place so the expanded list keeps its length.
-  function applyUsed(map) {
-    used = map;
-    els.groups.querySelectorAll("li").forEach((li) => paintItem(li, usedAt(li.dataset.index)));
-    refreshNext();
-  }
-
-  function renderList() {
-    iterator = variants(current);
-    rendered = 0;
-    lastGroup = -1;
-    currentList = null;
-    els.groups.textContent = "";
-    renderMore();
-    refreshNext();
-  }
-
-  function refreshNext() {
-    nextVariant = findNext();
-    const stamps = Object.values(used);
-    const total = totalCount(current);
-    if (nextVariant) {
-      els.nextEmail.textContent = nextVariant.address;
-      els.nextNum.textContent = "(№" + (nextVariant.index + 1) + ")";
-    } else {
-      els.nextEmail.textContent = "Все варианты использованы";
-      els.nextNum.textContent = "";
-    }
-    els.copyNextBtn.disabled = !nextVariant;
-    els.useNextBtn.disabled = !nextVariant;
-    els.resetBtn.disabled = stamps.length === 0;
-    const last = stamps.length ? Math.max.apply(null, stamps) : null;
-    els.lastUsed.textContent = last
-      ? "Последняя регистрация: " + formatDate(last) + " (" + daysAgo(last) + ")"
-      : "Регистраций ещё не было";
-    els.stats.textContent = "Использовано " + stamps.length + " из " + total.toLocaleString("ru-RU");
-    document.querySelectorAll("li.current").forEach((li) => li.classList.remove("current"));
-    if (nextVariant) {
-      const li = document.querySelector('li[data-index="' + nextVariant.index + '"]');
-      if (li) li.classList.add("current");
-    }
-  }
-
-  function dotsLabel(k) {
-    if (k === 0) return "Без точек";
-    const mod10 = k % 10, mod100 = k % 100;
-    const word = mod10 === 1 && mod100 !== 11 ? "точка"
-      : mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14) ? "точки" : "точек";
-    return k + " " + word;
-  }
-
-  function renderMore() {
-    const frag = document.createDocumentFragment();
-    let count = 0;
-    let done = false;
-    while (count < PAGE_SIZE) {
-      const step = iterator.next();
-      if (step.done) { done = true; break; }
-      const v = step.value;
-      if (v.dots !== lastGroup) {
-        lastGroup = v.dots;
-        const title = document.createElement("div");
-        title.className = "group-title";
-        title.textContent = dotsLabel(v.dots);
-        currentList = document.createElement("ul");
-        frag.appendChild(title);
-        frag.appendChild(currentList);
-      }
-      currentList.appendChild(renderItem(v));
-      count++;
-    }
-    els.groups.appendChild(frag);
-    rendered += count;
-    els.moreBtn.hidden = done || rendered >= totalCount(current);
-  }
-
-  function renderItem(v) {
-    const li = document.createElement("li");
-    li.dataset.index = v.index;
-    li.dataset.address = v.address;
-
-    const num = document.createElement("span");
-    num.className = "num";
-    num.textContent = v.index + 1;
-
-    const addr = document.createElement("span");
-    addr.className = "addr";
-    addr.textContent = v.address;
-
-    const date = document.createElement("span");
-    date.className = "date";
-
-    const copy = document.createElement("button");
-    copy.textContent = "⧉";
-    copy.title = "Скопировать";
-    copy.setAttribute("aria-label", "Скопировать");
-    copy.dataset.action = "copy";
-
-    const toggle = document.createElement("button");
-    toggle.dataset.action = "toggle";
-
-    li.append(num, addr, date, copy, toggle);
-    paintItem(li, usedAt(v.index));
-    return li;
-  }
-
-  function paintItem(li, ts) {
-    li.classList.toggle("used", !!ts);
-    li.querySelector(".date").textContent = ts ? formatDate(ts, true) : "";
-    const toggle = li.querySelector('[data-action="toggle"]');
-    toggle.textContent = ts ? "↺" : "✓";
-    toggle.title = ts ? "Вернуть" : "Отметить использованной";
-    toggle.setAttribute("aria-label", toggle.title);
-  }
-
-  let confirmAction = null;
-  function askConfirm(text, yesLabel, action) {
-    confirmAction = action;
-    els.confirmText.textContent = text;
-    els.confirmYes.textContent = yesLabel;
-    els.confirmBox.hidden = false;
-    els.confirmBox.scrollIntoView({ block: "nearest" });
-    els.confirmNo.focus();
-  }
-  function hideConfirm() {
-    confirmAction = null;
+  async function resetAll() {
     els.confirmBox.hidden = true;
+    const before = used;
+    applyUsed({});
+    try {
+      await request(usedUrl(email()), "DELETE");
+      showToast("Отметки сброшены");
+    } catch (e) {
+      applyUsed(before);
+      showToast("Не удалось сбросить, проверь интернет");
+    }
   }
 
   async function copyText(text) {
@@ -531,14 +745,17 @@
     } catch (e) {
       const ta = document.createElement("textarea");
       ta.value = text;
+      ta.setAttribute("readonly", "");
+      ta.style.position = "fixed";
+      ta.style.opacity = "0";
       document.body.appendChild(ta);
       ta.select();
       let ok = false;
       try { ok = document.execCommand("copy"); } catch (err) { ok = false; }
       ta.remove();
-      if (!ok) { showToast("Не удалось скопировать, выдели адрес вручную"); return; }
+      if (!ok) { showToast("Не удалось скопировать"); return; }
     }
-    showToast("Скопировано: " + text);
+    showToast("Скопировано");
   }
 
   let toastTimer = null;
@@ -546,74 +763,92 @@
     els.toast.textContent = text;
     els.toast.classList.add("show");
     clearTimeout(toastTimer);
-    toastTimer = setTimeout(() => els.toast.classList.remove("show"), 2200);
+    toastTimer = setTimeout(() => els.toast.classList.remove("show"), TOAST_MS);
+  }
+
+  // ---------- bottom sheet ----------
+  function openSheet() {
+    els.sheetInput.value = "";
+    updateSheet();
+    els.backdrop.hidden = false;
+    els.sheet.hidden = false;
+    requestAnimationFrame(() => {
+      els.backdrop.classList.add("open");
+      els.sheet.classList.add("open");
+      els.sheetInput.focus();
+    });
+  }
+
+  function closeSheet() {
+    els.backdrop.classList.remove("open");
+    els.sheet.classList.remove("open");
+    setTimeout(() => { els.backdrop.hidden = true; els.sheet.hidden = true; }, 240);
+  }
+
+  function updateSheet() {
+    const raw = els.sheetInput.value;
+    const parsed = parseLocal(raw);
+    els.sheetSave.disabled = !parsed;
+    hintFor(raw, parsed, els.sheetHint);
+  }
+
+  function saveEmail(raw) {
+    const parsed = parseLocal(raw);
+    if (!parsed) return false;
+    writeLocal({ current: parsed + DOMAIN });
+    openEmail(parsed);
+    return true;
   }
 
   // ---------- events ----------
-  els.saveBtn.addEventListener("click", () => {
-    const email = normalize(els.emailInput.value);
-    if (!email) { els.error.textContent = "Похоже, это не почта. Пример: name@gmail.com"; return; }
-    writeLocal({ current: email });
-    openEmail(email);
+  els.emailInput.addEventListener("input", updateSetup);
+  els.emailInput.addEventListener("keydown", (e) => { if (e.key === "Enter") els.saveBtn.click(); });
+  els.saveBtn.addEventListener("click", () => saveEmail(els.emailInput.value));
+
+  els.changeBtn.addEventListener("click", openSheet);
+  els.backdrop.addEventListener("click", closeSheet);
+  els.sheetInput.addEventListener("input", updateSheet);
+  els.sheetInput.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") els.sheetSave.click();
+    if (e.key === "Escape") closeSheet();
   });
-
-  els.emailInput.addEventListener("keydown", (e) => {
-    if (e.key === "Enter") els.saveBtn.click();
-  });
-
-  els.cancelBtn.addEventListener("click", () => openEmail(current));
-
-  els.changeBtn.addEventListener("click", () => {
-    askConfirm("Поменять почту? Отметки для текущей почты сохранятся.", "Поменять", showSetup);
-  });
-
-  els.resetBtn.addEventListener("click", () => {
-    const count = Object.keys(used).length;
-    askConfirm("Сбросить все отметки (" + count + ") для этой почты?", "Сбросить", async () => {
-      hideConfirm();
-      const before = used;
-      applyUsed({});
-      try {
-        await request(usedUrl(current), "DELETE");
-        showToast("Отметки сброшены");
-      } catch (e) {
-        applyUsed(before);
-        showToast("Не удалось сбросить, проверь интернет");
-      }
-    });
-  });
-
-  els.confirmYes.addEventListener("click", () => { if (confirmAction) confirmAction(); });
-  els.confirmNo.addEventListener("click", hideConfirm);
+  els.sheetSave.addEventListener("click", () => { if (saveEmail(els.sheetInput.value)) closeSheet(); });
 
   els.copyNextBtn.addEventListener("click", () => {
-    if (nextVariant) copyText(nextVariant.address);
+    if (nextIndex !== null) copyText(variantAt(local, nextIndex).parts.join(".") + DOMAIN);
   });
+  els.useNextBtn.addEventListener("click", () => { if (nextIndex !== null) setUsed(nextIndex, true); });
 
-  els.useNextBtn.addEventListener("click", () => {
-    if (nextVariant) setUsed(nextVariant.index, true);
-  });
+  els.resetBtn.addEventListener("click", () => { els.confirmBox.hidden = false; });
+  els.confirmNo.addEventListener("click", () => { els.confirmBox.hidden = true; });
+  els.confirmYes.addEventListener("click", resetAll);
 
-  els.moreBtn.addEventListener("click", () => { renderMore(); refreshNext(); });
+  [els.segAll, els.segFree, els.segUsed].forEach((b) => b.addEventListener("click", () => {
+    filter = b.dataset.filter;
+    renderSegments();
+    renderList(PAGE_SIZE);
+  }));
+
+  els.moreBtn.addEventListener("click", () => renderList(shown + PAGE_SIZE));
 
   els.groups.addEventListener("click", (e) => {
     const btn = e.target.closest("button[data-action]");
     if (!btn) return;
-    const li = btn.closest("li");
-    if (btn.dataset.action === "copy") copyText(li.dataset.address);
-    else setUsed(Number(li.dataset.index), !usedAt(li.dataset.index));
+    const index = Number(btn.closest("li").dataset.index);
+    if (btn.dataset.action === "copy") copyText(variantAt(local, index).parts.join(".") + DOMAIN);
+    else setUsed(index, btn.dataset.action === "mark");
   });
 
   // ---------- start ----------
   (async function start() {
-    showLoading("Подключаюсь к базе…");
+    show("loading");
     try {
       dbUrl = await resolveDb();
     } catch (e) {
-      showLoading("Не получилось подключиться к базе Firebase. Проверь интернет и правила базы (раздел Rules), потом обнови страницу.");
+      els.loadingText.textContent = "Не получилось подключиться к базе Firebase. Проверь интернет и правила базы (раздел Rules), потом обнови страницу.";
       return;
     }
-    const saved = readLocal().current;
+    const saved = parseLocal(readLocal().current || "");
     if (saved) openEmail(saved); else showSetup();
   })();
 })();
